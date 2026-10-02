@@ -11,7 +11,7 @@ const PADDING = 48;
 const MAX_LINES = 14;
 
 const SANS = "Inter, Montserrat, 'Noto Sans', 'Noto Sans Symbols 2', 'Noto Color Emoji'";
-const BACKDROP = "#191724";
+const BACKDROP = "#1a1b26";
 
 const FONTS_DIR = join(__dirname, "..", "fonts");
 
@@ -79,14 +79,14 @@ export async function renderQuoteCard(card: QuoteCard): Promise<Buffer> {
   const fadeStart = W / 4;
   const fadeEnd = W / 2 + 40;
   const gradient = ctx.createLinearGradient(fadeStart, 0, fadeEnd, 0);
-  gradient.addColorStop(0, "rgba(36, 23, 26, 0)");
-  gradient.addColorStop(0.7, "rgba(25, 23, 36, 1)");
+  gradient.addColorStop(0, "rgba(26, 27, 38, 0)");
+  gradient.addColorStop(0.7, "rgba(26, 27, 38, 1)");
   ctx.fillStyle = gradient;
   ctx.fillRect(fadeStart, 0, fadeEnd - fadeStart, H);
 
   // text region: centered in the right half, nudged left
   const nudge = 30;
-  const textCenterX = W / 2 + W / 4 - nudge; // 570
+  const textCenterX = W / 2
   const textWidth = W / 2 - PADDING * 2 - nudge * 2;
 
   ctx.textAlign = "left";
@@ -116,7 +116,7 @@ export async function renderQuoteCard(card: QuoteCard): Promise<Buffer> {
 
   // quote
   ctx.font = `600 ${quoteSize}px ${FONT_STACK}`;
-  ctx.fillStyle = "#e0def4";
+  ctx.fillStyle = "#c0caf5";
   for (const line of lines) {
     ctx.fillText(line, textCenterX, y);
     y += lineHeight;

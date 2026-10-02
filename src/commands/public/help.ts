@@ -1,6 +1,5 @@
 import {
   SlashCommandBuilder,
-  TextDisplayBuilder,
   type ChatInputCommandInteraction,
 } from "discord.js";
 import { canRun } from "../../functions/personnel";
