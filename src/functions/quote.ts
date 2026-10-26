@@ -1,17 +1,19 @@
-import { createCanvas, loadImage, GlobalFonts, type Image, type SKRSContext2D } from "@napi-rs/canvas";
+import { createCanvas, loadImage, GlobalFonts, type SKRSContext2D } from "@napi-rs/canvas";
 import type { User } from "discord.js";
 import { join } from "path";
 
 export interface QuoteCard {
   user: User;
   content: string;
+  style?: QuoteStyle;
 }
+
+export type QuoteStyle = "classic" | "neon" | "retro" | "bubble" | "minimal" | "void" | "sunset" | "cyberpunk";
+
+export type QuoteFont = "jakarta" | "inter" | "slabo" | "vt323" | "butterfly" | "system";
 
 const PADDING = 48;
 const MAX_LINES = 14;
-
-const SANS = "Inter, Montserrat, 'Noto Sans', 'Noto Sans Symbols 2', 'Noto Color Emoji'";
-const BACKDROP = "#1a1b26";
 
 const FONTS_DIR = join(__dirname, "..", "fonts");
 
@@ -35,11 +37,17 @@ function registerLocalFonts() {
 
 registerLocalFonts();
 
-function font(size: number, weight: number | string = 400): string {
-  return `${weight} ${size}px ${SANS}`;
-}
+export const QUOTE_STYLES: QuoteStyle[] = ["classic", "neon", "retro", "bubble", "minimal", "void", "sunset", "cyberpunk"];
+export const QUOTE_FONTS: QuoteFont[] = ["jakarta", "inter", "slabo", "vt323", "butterfly", "system"];
 
-const FONT_STACK = "'Plus Jakarta Sans', Inter, 'Noto Sans', 'Noto Color Emoji', sans-serif";
+const FONT_MAP: Record<QuoteFont, string> = {
+  jakarta: "'Plus Jakarta Sans', Inter, 'Noto Sans', 'Noto Color Emoji', sans-serif",
+  inter: "Inter, 'Plus Jakarta Sans', 'Noto Sans', 'Noto Color Emoji', sans-serif",
+  slabo: "'Slabo 13px', Georgia, serif",
+  vt323: "VT323, 'Courier New', monospace",
+  butterfly: "'Butterfly Kids', cursive, serif",
+  system: "system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
+};
 
 function wrapText(ctx: SKRSContext2D, text: string, maxWidth: number): string[] {
   const words = text.split(/\s+/);
@@ -59,18 +67,91 @@ function wrapText(ctx: SKRSContext2D, text: string, maxWidth: number): string[] 
   return lines;
 }
 
-export async function renderQuoteCard(card: QuoteCard): Promise<Buffer> {
+function getStyle(style: QuoteStyle = "classic") {
+  switch (style) {
+    case "neon":
+      return {
+        backdrop: "#0a0a1a",
+        quoteColor: "#39ff14",
+        authorColor: "#ff6ec7",
+        glow: true,
+      };
+    case "retro":
+      return {
+        backdrop: "#2b1d0e",
+        quoteColor: "#f5d16e",
+        authorColor: "#d4b942",
+        sepia: true,
+      };
+    case "bubble":
+      return {
+        backdrop: "#7c3fbf",
+        quoteColor: "#ffffff",
+        authorColor: "#f3e8ff",
+        bubble: true,
+      };
+    case "minimal":
+      return {
+        backdrop: "#111111",
+        quoteColor: "#ffffff",
+        authorColor: "#aaaaaa",
+      };
+    case "void":
+      return {
+        backdrop: "#000000",
+        quoteColor: "#e4e4e7",
+        authorColor: "#71717a",
+      };
+    case "sunset":
+      return {
+        backdrop: "#1a0e1f",
+        quoteColor: "#ff9f45",
+        authorColor: "#ff7b9d",
+      };
+    case "cyberpunk":
+      return {
+        backdrop: "#0f0f23",
+        quoteColor: "#00ffff",
+        authorColor: "#ff00ff",
+        glow: true,
+      };
+    case "classic":
+    default:
+      return {
+        backdrop: "#1a1b26",
+        quoteColor: "#c0caf5",
+        authorColor: "#6e6a86",
+      };
+  }
+}
+
+export async function renderQuoteCard(card: QuoteCard, fontChoice: QuoteFont = "jakarta"): Promise<Buffer> {
   const W = 800;
   const H = 400;
   const canvas = createCanvas(W, H);
   const ctx = canvas.getContext("2d");
-  const { user, content } = card;
+  const { user, content, style = "classic" } = card;
+  const theme = getStyle(style);
+  const fontStack = FONT_MAP[fontChoice];
 
   const avatar = await loadImage(user.displayAvatarURL({ extension: "png", size: 512 }));
 
   // background
-  ctx.fillStyle = BACKDROP;
+  ctx.fillStyle = theme.backdrop;
   ctx.fillRect(0, 0, W, H);
+
+  if (theme.bubble) {
+    // fun bubble style
+    ctx.save();
+    ctx.globalAlpha = 0.15;
+    ctx.beginPath();
+    ctx.arc(150, 100, 80, 0, Math.PI * 2);
+    ctx.arc(650, 50, 60, 0, Math.PI * 2);
+    ctx.arc(600, 300, 100, 0, Math.PI * 2);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+    ctx.restore();
+  }
 
   // avatar on the left half
   ctx.drawImage(avatar, 0, 0, W / 2, H);
@@ -79,20 +160,19 @@ export async function renderQuoteCard(card: QuoteCard): Promise<Buffer> {
   const fadeStart = W / 4;
   const fadeEnd = W / 2 + 40;
   const gradient = ctx.createLinearGradient(fadeStart, 0, fadeEnd, 0);
-  gradient.addColorStop(0, "rgba(26, 27, 38, 0)");
-  gradient.addColorStop(0.7, "rgba(26, 27, 38, 1)");
+  gradient.addColorStop(0, "rgba(0,0,0,0)");
+  gradient.addColorStop(1, theme.backdrop);
   ctx.fillStyle = gradient;
   ctx.fillRect(fadeStart, 0, fadeEnd - fadeStart, H);
 
-  // text region: centered in the right half, nudged left
+  // text region
   const nudge = 30;
-  const textCenterX = W / 2
+  const textCenterX = W / 2;
   const textWidth = W / 2 - PADDING * 2 - nudge * 2;
 
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
 
-  // auto-fit: shrink the font until the quote fits the available height
   const authorSize = 22;
   const gap = 24;
   const maxBlockHeight = H - PADDING * 2;
@@ -102,7 +182,7 @@ export async function renderQuoteCard(card: QuoteCard): Promise<Buffer> {
   let lines: string[] = [];
 
   while (quoteSize >= 16) {
-    ctx.font = `600 ${quoteSize}px ${FONT_STACK}`;
+    ctx.font = `600 ${quoteSize}px ${fontStack}`;
     lineHeight = quoteSize * 1.3;
     lines = wrapText(ctx, content, textWidth);
     const blockHeight = lines.length * lineHeight + gap + authorSize;
@@ -110,22 +190,26 @@ export async function renderQuoteCard(card: QuoteCard): Promise<Buffer> {
     quoteSize -= 2;
   }
 
-  // vertically center the whole block (quote + author)
   const blockHeight = lines.length * lineHeight + gap + authorSize;
   let y = (H - blockHeight) / 2 + lineHeight / 2;
 
   // quote
-  ctx.font = `600 ${quoteSize}px ${FONT_STACK}`;
-  ctx.fillStyle = "#c0caf5";
+  ctx.font = `600 ${quoteSize}px ${fontStack}`;
+  ctx.fillStyle = theme.quoteColor;
+  if (theme.glow) {
+    ctx.shadowColor = theme.quoteColor;
+    ctx.shadowBlur = 10;
+  }
   for (const line of lines) {
     ctx.fillText(line, textCenterX, y);
     y += lineHeight;
   }
+  ctx.shadowBlur = 0;
 
   // author
   y += gap - lineHeight / 2 + authorSize / 2;
-  ctx.font = `400 ${authorSize}px ${FONT_STACK}`;
-  ctx.fillStyle = "#6e6a86";
+  ctx.font = `400 ${authorSize}px ${fontStack}`;
+  ctx.fillStyle = theme.authorColor;
   ctx.fillText(`- @${user.username}`, textCenterX, y);
 
   return canvas.toBuffer("image/png");
